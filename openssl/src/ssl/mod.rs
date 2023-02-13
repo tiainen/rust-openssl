@@ -82,7 +82,7 @@ use crate::{cvt, cvt_n, cvt_p, init};
 use bitflags::bitflags;
 use cfg_if::cfg_if;
 use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
-use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_void};
+use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
 use once_cell::sync::{Lazy, OnceCell};
 use openssl_macros::corresponds;
 use std::any::TypeId;
@@ -1212,6 +1212,39 @@ impl SslContextBuilder {
             );
             // fun fact, SSL_CTX_set_alpn_protos has a reversed return code D:
             if r == 0 {
+                Ok(())
+            } else {
+                Err(ErrorStack::get())
+            }
+        }
+    }
+
+    #[corresponds(SSL_CTX_ech_set1_echconfig)]
+    pub fn ech_set1_echconfig(&mut self, config: &[u8]) -> Result<(), ErrorStack> {
+        unsafe {
+            let r = ffi::SSL_CTX_ech_set1_echconfig(
+                self.as_ptr(),
+                config.as_ptr() as *mut _,
+                config.len() as c_ulong,
+            );
+            if r == 1 {
+                Ok(())
+            } else {
+                Err(ErrorStack::get())
+            }
+        }
+    }
+
+    #[corresponds(SSL_CTX_ech_set_outer_alpn_protos)]
+    pub fn ech_set_outer_alpn_protos(&mut self, protocols: &[u8]) -> Result<(), ErrorStack> {
+        unsafe {
+            assert!(protocols.len() <= c_uint::max_value() as usize);
+            let r = ffi::SSL_CTX_ech_set_outer_alpn_protos(
+                self.as_ptr(),
+                protocols.as_ptr(),
+                protocols.len() as c_ulong,
+            );
+            if r == 1 {
                 Ok(())
             } else {
                 Err(ErrorStack::get())
@@ -2406,6 +2439,45 @@ impl SslRef {
             );
             // fun fact, SSL_set_alpn_protos has a reversed return code D:
             if r == 0 {
+                Ok(())
+            } else {
+                Err(ErrorStack::get())
+            }
+        }
+    }
+
+    ///
+    #[corresponds(SSL_ech_set1_echconfig)]
+    pub fn set_ech_config(&mut self, config: &[u8]) -> Result<(), ErrorStack> {
+        unsafe {
+            let r = ffi::SSL_ech_set1_echconfig(
+                self.as_ptr(),
+                config.as_ptr() as *mut _,
+                config.len() as c_ulong,
+            );
+            if r == 1 {
+                Ok(())
+            } else {
+                Err(ErrorStack::get())
+            }
+        }
+    }
+
+    ///
+    #[corresponds(SSL_ech_set_outer_server_name)]
+    pub fn set_ech_set_outer_server_name(
+        &mut self,
+        outer_name: &str,
+        no_outer: i32,
+    ) -> Result<(), ErrorStack> {
+        let cstr = CString::new(outer_name).unwrap();
+        unsafe {
+            let r = ffi::SSL_ech_set_outer_server_name(
+                self.as_ptr(),
+                cstr.as_ptr() as *mut _,
+                no_outer,
+            );
+            if r == 1 {
                 Ok(())
             } else {
                 Err(ErrorStack::get())
